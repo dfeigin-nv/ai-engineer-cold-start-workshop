@@ -66,3 +66,4 @@ for lane in "${lanes[@]}"; do
   push_demo_status "$lane" "${icon} FIXED LOAD ACTIVE · 6 req/s · run demo ${1:---both}"
 done
 info "${prepare_mode} is prepared: one worker per lane and fixed 6 req/s load active"
+info "Grafana: $GRAFANA_DASHBOARD_URL"
