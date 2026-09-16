@@ -15,6 +15,8 @@ export AIPERF_MODE="$demo_mode"
 
 for command_name in kubectl curl jq; do require_command "$command_name"; done
 validate_config
+start_vcluster_forward
+start_grafana_forward
 
 [ -f "$STATE_DIR/prepared.json" ] \
   || die "the demo is not prepared; run ./workshop.sh prepare --${demo_mode}"
@@ -46,13 +48,7 @@ cleanup_demo() {
 trap cleanup_demo EXIT INT TERM
 
 for lane in "${lanes[@]}"; do
-  if [ "$lane" = base ]; then
-    port="$BASE_FRONTEND_LOCAL_PORT"
-  else
-    port="$FAST_FRONTEND_LOCAL_PORT"
-  fi
-  curl -fsS "http://127.0.0.1:${port}/health" >/dev/null 2>&1 \
-    || die "prepared ${lane} frontend is not reachable; run ./workshop.sh prepare --${demo_mode}"
+  ensure_frontend_forward "$lane"
 done
 
 info "prepared AIPerf load is active; firing ${demo_mode} without reset"

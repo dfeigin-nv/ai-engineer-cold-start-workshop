@@ -1,11 +1,6 @@
-# snapshot-agent values for the workshop vcluster (dynamo 1.3.0 integrated path).
+# snapshot-agent values for the workshop vcluster (Dynamo 1.4.0).
 #
-# Adapted from autoscale-poc-nscale/prep/snapshot-agent-values-fast-criu-nscale.yaml:
-#   - image moved to the stock 1.3.0 release image (the poc used a
-#     dev-cbc8cac5-aio custom build; today's earlier install wrongly used the
-#     standalone-repo image ghcr.io/ai-dynamo/snapshot/agent, which belongs to
-#     the other product line entirely)
-#   - installs into the vcluster's `default` namespace, where snapshot-pvc lives
+# Installs into the vcluster's `default` namespace, where snapshot-pvc lives.
 #
 # seccomp.deploy=true: the workload's torch creates io_uring fds that CRIU
 # cannot dump ("Unknown shit ... anon_inode:[io_uring]"). The initContainer
@@ -20,7 +15,7 @@ storage:
 daemonset:
   image:
     repository: nvcr.io/nvidia/ai-dynamo/snapshot-agent
-    tag: "1.3.0"
+    tag: "1.4.0"
     pullPolicy: IfNotPresent
   imagePullSecrets:
     - name: ngc-secret
@@ -40,3 +35,4 @@ seccomp:
 config:
   criu:
     lazyPages: false
+    imageIoMode: direct

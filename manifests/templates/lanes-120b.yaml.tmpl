@@ -6,8 +6,7 @@
 #   - namespace `default` (where snapshot-pvc / shared-model-cache / ngc-secret
 #     live inside the vcluster).
 #
-# All images use the 1.3.0 contract. checkpointWorker MUST match the placeholder
-# exactly or nsrestore fails with "File X has bad size".
+# Runtime and placeholder images must be built from the same Dynamo 1.4 release.
 ---
 # Lane: fast-criu — checkpoint enabled, restores from a CRIU dump.
 apiVersion: nvidia.com/v1alpha1
@@ -22,7 +21,7 @@ spec:
       replicas: 1
       extraPodSpec:
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
         imagePullSecrets:
           - name: ngc-secret
@@ -31,17 +30,7 @@ spec:
       replicas: 1
       checkpoint:
         enabled: true
-        mode: Auto
-        # Must match the worker args below exactly — the agent hashes this to
-        # find the dump on disk. dtype "auto" because --dtype is omitted so
-        # vLLM auto-detects MXFP4 from the safetensors.
-        identity:
-          model: "openai/gpt-oss-120b"
-          backendFramework: "vllm"
-          tensorParallelSize: 1
-          pipelineParallelSize: 1
-          dtype: "auto"
-          maxModelLen: 2048
+        startupPolicy: Immediate
       resources:
         limits:
           gpu: "1"
@@ -90,7 +79,7 @@ spec:
               # NOT readOnly: ModelExpress writes missing manifest files into
               # the cache and crashes with EROFS on a read-only mount.
         mainContainer:
-          image: nvcr.io/0980761089281446/dynamo-vllm-placeholder:1.3.0
+          image: ${VLLM_PLACEHOLDER_IMAGE}
           imagePullPolicy: IfNotPresent
           startupProbe:
             httpGet: { path: /live, port: system, scheme: HTTP }
@@ -151,7 +140,7 @@ spec:
       replicas: 1
       extraPodSpec:
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
         imagePullSecrets:
           - name: ngc-secret
@@ -200,7 +189,7 @@ spec:
             emptyDir:
               medium: Memory
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0

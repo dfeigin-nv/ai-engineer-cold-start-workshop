@@ -33,7 +33,6 @@ helm upgrade --install "$VCLUSTER_NAME" loft/vcluster \
 
 info 'installing the persistent AIPerf runner'
 host_kubectl apply -f "$RENDERED_DIR/aiperf-runner.yaml"
-host_kubectl -n "$HOST_NAMESPACE" rollout restart deployment/workshop-aiperf-runner
 host_kubectl -n "$HOST_NAMESPACE" rollout status deployment/workshop-aiperf-runner \
   --timeout=10m
 
@@ -112,7 +111,7 @@ info "deploying the ${MODEL_PRESET} comparison lanes"
 if [ "$MODEL_PRESET" = 120b ]; then
   lane_manifest="$RENDERED_DIR/lanes-120b.yaml"
 else
-  lane_manifest="$ROOT_DIR/manifests/lanes-qwen06b.yaml"
+  lane_manifest="$RENDERED_DIR/lanes-qwen06b.yaml"
 fi
 vc_kubectl apply -f "$lane_manifest"
 wait_for_dgds_ready 1200 || die 'lane DGDs did not reconcile the applied generation within 20 minutes'

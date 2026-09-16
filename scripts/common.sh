@@ -62,6 +62,9 @@ stop_pid_file() {
 extract_vcluster_kubeconfig() {
   host_kubectl -n "$HOST_NAMESPACE" get secret "vc-${VCLUSTER_NAME}" \
     -o jsonpath='{.data.config}' | base64 -d >"$VCLUSTER_KUBECONFIG"
+  kubectl config set-cluster kubernetes \
+    --server="https://localhost:${VCLUSTER_LOCAL_PORT}" \
+    --kubeconfig="$VCLUSTER_KUBECONFIG" >/dev/null
   chmod 600 "$VCLUSTER_KUBECONFIG"
 }
 
@@ -255,6 +258,7 @@ render_manifests() {
   export WORKER_CPU_REQUEST WORKER_CPU_LIMIT
   export WORKER_MEMORY_REQUEST WORKER_MEMORY_LIMIT
   export KV_CACHE_MEMORY_BYTES
+  export VLLM_RUNTIME_IMAGE VLLM_PLACEHOLDER_IMAGE
   export AIPERF_MODEL AIPERF_MODE AIPERF_CONCURRENCY AIPERF_DURATION_SECONDS AIPERF_MAX_COMPLETION_TOKENS
 
   # shellcheck disable=SC2016
@@ -286,15 +290,21 @@ render_manifests() {
     <"$ROOT_DIR/manifests/templates/aiperf-runner.yaml.tmpl" \
     >"$RENDERED_DIR/aiperf-runner.yaml"
   # shellcheck disable=SC2016
-  envsubst '${WORKER_CPU_REQUEST} ${WORKER_CPU_LIMIT} ${WORKER_MEMORY_REQUEST} ${WORKER_MEMORY_LIMIT} ${KV_CACHE_MEMORY_BYTES}' \
+  envsubst '${WORKER_CPU_REQUEST} ${WORKER_CPU_LIMIT} ${WORKER_MEMORY_REQUEST} ${WORKER_MEMORY_LIMIT} ${KV_CACHE_MEMORY_BYTES} ${VLLM_RUNTIME_IMAGE} ${VLLM_PLACEHOLDER_IMAGE}' \
     <"$ROOT_DIR/manifests/templates/lanes-120b.yaml.tmpl" \
     >"$RENDERED_DIR/lanes-120b.yaml"
+  # shellcheck disable=SC2016
+  envsubst '${VLLM_RUNTIME_IMAGE} ${VLLM_PLACEHOLDER_IMAGE}' \
+    <"$ROOT_DIR/manifests/lanes-qwen06b.yaml" \
+    >"$RENDERED_DIR/lanes-qwen06b.yaml"
 }
 
 validate_config() {
   [ -n "$HOST_CONTEXT" ] || die 'HOST_CONTEXT is empty'
   [ -n "$HOST_NAMESPACE" ] || die 'HOST_NAMESPACE is empty'
   [ -n "$VCLUSTER_NAME" ] || die 'VCLUSTER_NAME is empty'
+  [ -n "$VLLM_RUNTIME_IMAGE" ] || die 'VLLM_RUNTIME_IMAGE is empty'
+  [ -n "$VLLM_PLACEHOLDER_IMAGE" ] || die 'VLLM_PLACEHOLDER_IMAGE is empty'
   [ -n "$GRAFANA_LOKI_DATASOURCE_UID" ] || die 'GRAFANA_LOKI_DATASOURCE_UID is empty'
   [ -n "$STORAGE_CLASS" ] || die 'STORAGE_CLASS is empty'
   [ -n "$WORKER_CPU_REQUEST" ] || die 'WORKER_CPU_REQUEST is empty'

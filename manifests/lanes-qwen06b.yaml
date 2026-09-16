@@ -1,4 +1,4 @@
-# Workshop demo lanes, Qwen3-0.6B, ALL-1.3.0 images (no shim), for the `workshop` vcluster (default ns).
+# Workshop demo lanes, Qwen3-0.6B, for the `workshop` vcluster (default ns).
 #
 # Adapted from autoscale-poc-nscale's chart templates, with two changes:
 #   - No KEDA. `scalingAdapter` is dropped and replicas are explicit, so the
@@ -6,9 +6,7 @@
 #   - namespace `default` (where snapshot-pvc / shared-model-cache / ngc-secret
 #     live inside the vcluster).
 #
-# Images stay on the dev-cbc8cac5 pins: the placeholder is restore-critical and
-# has no 1.3.0 equivalent, and checkpointWorker MUST match placeholder exactly
-# or nsrestore fails with "File X has bad size".
+# Runtime and placeholder images must be built from the same Dynamo 1.4 release.
 ---
 # Lane: fast-criu — checkpoint enabled, restores from a CRIU dump.
 apiVersion: nvidia.com/v1alpha1
@@ -23,7 +21,7 @@ spec:
       replicas: 1
       extraPodSpec:
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
         imagePullSecrets:
           - name: ngc-secret
@@ -32,17 +30,7 @@ spec:
       replicas: 1
       checkpoint:
         enabled: true
-        mode: Auto
-        # Must match the worker args below exactly — the agent hashes this to
-        # find the dump on disk. 0.6B passes --dtype bfloat16 explicitly, so
-        # the identity records bfloat16 (not "auto").
-        identity:
-          model: "Qwen/Qwen3-0.6B"
-          backendFramework: "vllm"
-          tensorParallelSize: 1
-          pipelineParallelSize: 1
-          dtype: "bfloat16"
-          maxModelLen: 2048
+        startupPolicy: Immediate
       resources:
         limits:
           gpu: "1"
@@ -91,7 +79,7 @@ spec:
               # NOT readOnly: ModelExpress writes missing manifest files into
               # the cache and crashes with EROFS on a read-only mount.
         mainContainer:
-          image: nvcr.io/0980761089281446/dynamo-vllm-placeholder:1.3.0
+          image: ${VLLM_PLACEHOLDER_IMAGE}
           imagePullPolicy: IfNotPresent
           startupProbe:
             httpGet: { path: /live, port: system, scheme: HTTP }
@@ -152,7 +140,7 @@ spec:
       replicas: 1
       extraPodSpec:
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
         imagePullSecrets:
           - name: ngc-secret
@@ -198,7 +186,7 @@ spec:
             persistentVolumeClaim:
               claimName: shared-model-cache
         mainContainer:
-          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.3.0
+          image: ${VLLM_RUNTIME_IMAGE}
           imagePullPolicy: IfNotPresent
           command: [python3]
           args:

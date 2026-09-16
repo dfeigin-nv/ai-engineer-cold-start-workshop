@@ -1,5 +1,6 @@
 # PVCs created INSIDE the workshop vcluster (default namespace).
-# vcluster syncs them to the host as <name>-x-default-x-workshop.
+# vcluster syncs them to the host as
+# <name>-x-default-x-${VCLUSTER_NAME}.
 ---
 # Binds to the pre-created host PV workshop-shared-model-cache (shared NFS
 # model cache). storageClassName "" prevents dynamic provisioning.
@@ -8,6 +9,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: shared-model-cache
   namespace: default
+  annotations:
+    velonix.nvidia.com/allow-private-model-cache: "true"
+    velonix.nvidia.com/private-model-cache-reason: >-
+      vcluster-synced claim pre-bound to the namespace shared model-cache export
 spec:
   accessModes:
     - ReadWriteMany

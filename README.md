@@ -1,6 +1,6 @@
 # AI Engineer cold-start workshop
 
-This workshop makes the checkpoint-restore advantage visible under real inference
+This Dynamo 1.4.0 workshop makes the checkpoint-restore advantage visible under real inference
 load. Two otherwise equivalent NVIDIA Dynamo lanes begin with one Ready vLLM worker:
 
 - **cold-start** starts a second worker normally;
@@ -27,6 +27,10 @@ The dashboard contains one red cold-start line and one green snapshot line, plus
 event markers: demo fired, snapshot completed, and cold-start completed. Grafana
 refreshes every 2 seconds. Prometheus scrapes the workshop frontends every second; the
 chart plots a 30-second rolling p50 at 10-second points to keep the comparison readable.
+
+A validated Dynamo 1.4.0 run on B200 measured 429.2 seconds from container start to
+first token for cold-start and 25.2 seconds for snapshot restore: a 17.03x speedup.
+Both lanes settled near 15-20 ms serving TTFT after the second worker joined.
 
 ## Run the workshop
 
@@ -91,9 +95,28 @@ the audience never waits for preparation.
 By default, setup clones the configured Dynamo release into ignored `.state/`.
 Set `DYNAMO_SOURCE_DIR` to reuse an existing checkout.
 
+The workload manifests use the v1alpha1 `DynamoGraphDeployment` compatibility API
+still served by Dynamo 1.4.0; the operator stores them as v1beta1. The snapshot path
+is `DynamoGraphDeployment` -> `DynamoCheckpoint` -> checkpoint `Job`, with
+`PodSnapshot` and `PodSnapshotContent` recording capture state. There is no
+`SnapshotJob` CRD in this flow.
+
+Snapshot restore requires a placeholder built from the exact runtime release. Build
+and publish it before setup, then set `VLLM_PLACEHOLDER_IMAGE` in `config.local.env`:
+
+```bash
+git clone --depth 1 --branch v1.4.0 https://github.com/ai-dynamo/dynamo.git
+make -C dynamo/deploy/snapshot docker-build-placeholder \
+  PLACEHOLDER_BASE_IMG=nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.4.0 \
+  PLACEHOLDER_IMG=REGISTRY/vllm-placeholder:1.4.0
+docker push REGISTRY/vllm-placeholder:1.4.0
+```
+
 ## Important configuration
 
 - `MODEL_PRESET=120b|qwen06b` selects the workload manifest.
+- `VLLM_RUNTIME_IMAGE` and `VLLM_PLACEHOLDER_IMAGE` must come from the same
+  Dynamo release. The default configuration targets 1.4.0.
 - The 120B preset requests 32 CPU cores and 192 GiB RAM per worker, with limits of
   127 cores and 256 GiB. Override `WORKER_CPU_*` and `WORKER_MEMORY_*` for the cluster.
 - `KV_CACHE_MEMORY_BYTES=68719476736` allocates a 64 GiB KV cache. The cold-start
