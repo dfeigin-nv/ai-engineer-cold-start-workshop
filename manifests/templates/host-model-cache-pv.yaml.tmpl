@@ -1,0 +1,39 @@
+# Host-side static PV giving the workshop vcluster access to the SHARED model
+# cache NFS export — the same path every other tenant mounts. Without this a
+# vcluster PVC would dynamically provision an empty volume and the 120B weights
+# (~63 GB) would re-download.
+#
+# claimRef pre-binds to the host-side name that vcluster gives the synced PVC:
+#   <pvc>-x-<vcluster-namespace>-x-<vcluster-release>
+# i.e. PVC `shared-model-cache` in the vcluster's `default` namespace.
+#
+# Modeled on dyn-opt-shared-model-cache, which does the same for the dyn-opt
+# vcluster. Reclaim policy Retain — never let this delete the shared cache.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${VCLUSTER_NAME}-shared-model-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: ${MODEL_CACHE_SIZE}
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: shared-model-cache-x-default-x-${VCLUSTER_NAME}
+    namespace: ${HOST_NAMESPACE}
+  mountOptions:
+    - nconnect=16
+    - hard
+    - timeo=600
+    - retrans=3
+    - rsize=1048576
+    - wsize=1048576
+    - resvport
+    - async
+  nfs:
+    path: ${MODEL_CACHE_NFS_PATH}
+    server: ${MODEL_CACHE_NFS_SERVER}
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem

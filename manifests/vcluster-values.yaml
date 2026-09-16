@@ -1,0 +1,44 @@
+# vcluster values for the workshop cold-start demo.
+# vcluster 0.36.1 settings required by the workshop.
+#
+# sync.fromHost.nodes pulls the host's GPU nodes into the virtual cluster so
+# DaemonSets (snapshot agent) schedule and GPU resources are visible inside.
+controlPlane:
+  backingStore:
+    etcd:
+      deploy:
+        enabled: true
+      embedded:
+        enabled: false
+
+  # Only GPU nodes are synced in, and they all carry taints, so coredns has
+  # nowhere to land without these. Without it DNS inside the vcluster never
+  # starts and service discovery (frontend -> worker, etcd, nats) fails.
+  coredns:
+    deployment:
+      tolerations:
+        - operator: Exists
+
+sync:
+  fromHost:
+    # Sync ALL host nodes, not just GPU ones. Restricting to
+    # nvidia.com/gpu.present pins every synced pod to GPU nodes, which are all
+    # tainted nvidia.com/gpu:NoSchedule — so control-plane pods (operator,
+    # etcd, nats, coredns) had nowhere to go: the untainted CPU nodes "didn't
+    # match selector" and the GPU nodes had "untolerated taints".
+    # Syncing everything mirrors how the host cluster actually schedules.
+    nodes:
+      enabled: true
+      selector:
+        all: true
+
+    # Default is "auto", which only turns on with the virtual scheduler; with
+    # real node sync it left the vcluster with zero StorageClasses, so the
+    # vast RWX class for snapshot-pvc / shared-model-cache was invisible.
+    storageClasses:
+      enabled: true
+
+    # Default false. GPU workloads need runtimeClassName: nvidia, and a
+    # missing RuntimeClass fails silently at checkpoint time.
+    runtimeClasses:
+      enabled: true

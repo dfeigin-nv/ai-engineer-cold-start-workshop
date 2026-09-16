@@ -1,0 +1,42 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: workshop-vcluster-frontend
+  namespace: ${MONITORING_NAMESPACE}
+  labels:
+    release: ${PROMETHEUS_RELEASE}
+    app.kubernetes.io/part-of: workshop-vcluster
+spec:
+  namespaceSelector:
+    matchNames:
+      - ${HOST_NAMESPACE}
+  selector:
+    matchLabels:
+      nvidia.com/dynamo-component-type: frontend
+      nvidia.com/metrics-enabled: "true"
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 1s
+      honorLabels: true
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: workshop-vcluster-worker
+  namespace: ${MONITORING_NAMESPACE}
+  labels:
+    release: ${PROMETHEUS_RELEASE}
+    app.kubernetes.io/part-of: workshop-vcluster
+spec:
+  namespaceSelector:
+    matchNames:
+      - ${HOST_NAMESPACE}
+  selector:
+    matchLabels:
+      nvidia.com/dynamo-component-type: worker
+      nvidia.com/metrics-enabled: "true"
+  podMetricsEndpoints:
+    - port: system
+      path: /metrics
+      interval: 2s

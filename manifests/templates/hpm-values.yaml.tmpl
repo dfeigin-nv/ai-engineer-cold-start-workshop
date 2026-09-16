@@ -1,0 +1,9 @@
+# vcluster hostpath mapper — lets the snapshot agent inside the vcluster
+# resolve real host paths.
+VclusterReleaseName: ${VCLUSTER_NAME}
+
+nodeSelector:
+  nvidia.com/gpu.present: "true"
+
+tolerations:
+  - operator: Exists

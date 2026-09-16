@@ -1,0 +1,32 @@
+# PVCs created INSIDE the workshop vcluster (default namespace).
+# vcluster syncs them to the host as <name>-x-default-x-workshop.
+---
+# Binds to the pre-created host PV workshop-shared-model-cache (shared NFS
+# model cache). storageClassName "" prevents dynamic provisioning.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-model-cache
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: ${MODEL_CACHE_SIZE}
+---
+# Checkpoint storage. Dynamically provisioned on vast — these are fresh
+# checkpoints, nothing to carry over.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ${STORAGE_CLASS}
+  resources:
+    requests:
+      storage: ${SNAPSHOT_SIZE}

@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workshop-vcluster-dashboard
+  namespace: ${MONITORING_NAMESPACE}
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: workshop-vcluster
+data:
+  workshop-vcluster.json: |-
+    {
+      "annotations": {
+        "list": [
+          {
+            "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
+            "enable": true,
+            "expr": "{job=\"workshop-vcluster-status\", lane=\"base\"} |= \"Requested\"",
+            "hide": false,
+            "iconColor": "blue",
+            "name": "Demo fired",
+            "textFormat": "Demo fired",
+            "titleFormat": "Demo fired"
+          },
+          {
+            "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
+            "enable": true,
+            "expr": "{job=\"workshop-vcluster-status\", lane=\"fast-criu\"} |= \"container start → first token\"",
+            "hide": false,
+            "iconColor": "green",
+            "name": "Snapshot completed",
+            "textFormat": "Snapshot completed",
+            "titleFormat": "Snapshot completed"
+          },
+          {
+            "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
+            "enable": true,
+            "expr": "{job=\"workshop-vcluster-status\", lane=\"base\"} |= \"container start → first token\"",
+            "hide": false,
+            "iconColor": "red",
+            "name": "Cold-start completed",
+            "textFormat": "Cold-start completed",
+            "titleFormat": "Cold-start completed"
+          }
+        ]
+      },
+      "editable": true,
+      "graphTooltip": 0,
+      "panels": [
+        {
+          "fieldConfig": {"defaults": {}, "overrides": []},
+          "gridPos": {"h": 5, "w": 24, "x": 0, "y": 0},
+          "id": 1,
+          "options": {
+            "content": "<div style=\"font-size:48px;font-weight:700;line-height:1.15;padding-top:8px;\">Cold start vs checkpoint restore</div>",
+            "mode": "html"
+          },
+          "title": "",
+          "type": "text"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
+          "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []},
+          "gridPos": {"h": 4, "w": 12, "x": 0, "y": 5},
+          "id": 7,
+          "options": {"colorMode": "none", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^Line$/", "values": false}, "textMode": "value", "wideLayout": true},
+          "targets": [{"datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"}, "editorMode": "code", "expr": "{job=\"workshop-vcluster-status\", lane=\"base\"}", "maxLines": 1, "queryType": "range", "refId": "A"}],
+          "title": "Cold-start",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
+          "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}}, "overrides": []},
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 5},
+          "id": 8,
+          "options": {"colorMode": "none", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^Line$/", "values": false}, "textMode": "value", "wideLayout": true},
+          "targets": [{"datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"}, "editorMode": "code", "expr": "{job=\"workshop-vcluster-status\", lane=\"fast-criu\"}", "maxLines": 1, "queryType": "range", "refId": "A"}],
+          "title": "Snapshot",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "${GRAFANA_DATASOURCE_UID}"},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"axisGridShow": false, "drawStyle": "line", "fillOpacity": 0, "gradientMode": "none", "lineInterpolation": "linear", "lineStyle": {"fill": "solid"}, "lineWidth": 3, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}},
+              "unit": "ms"
+            },
+            "overrides": [
+              {
+                "matcher": {"id": "byFrameRefID", "options": "A"},
+                "properties": [
+                  {"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}},
+                  {"id": "custom.lineWidth", "value": 7}
+                ]
+              },
+              {
+                "matcher": {"id": "byFrameRefID", "options": "B"},
+                "properties": [
+                  {"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}},
+                  {"id": "custom.lineWidth", "value": 3}
+                ]
+              }
+            ]
+          },
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 9},
+          "id": 3,
+          "options": {
+            "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+            "tooltip": {"mode": "none", "sort": "none"}
+          },
+          "targets": [
+            {
+              "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(dynamo_frontend_time_to_first_token_seconds_bucket{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"vllm-base-frontend-.*\"}[30s])))",
+              "interval": "10s",
+              "legendFormat": "cold-start",
+              "refId": "A"
+            },
+            {
+              "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(dynamo_frontend_time_to_first_token_seconds_bucket{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"vllm-fast-criu-frontend-.*\"}[30s])))",
+              "interval": "10s",
+              "legendFormat": "snapshot",
+              "refId": "B"
+            }
+          ],
+          "title": "Serving TTFT under fixed load (6 req/s per lane)",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "2s",
+      "schemaVersion": 38,
+      "tags": ["workshop-vcluster", "checkpoint-restore"],
+      "templating": {"list": []},
+      "time": {"from": "now-15m", "to": "now"},
+      "timepicker": {"refresh_intervals": ["2s", "5s", "10s", "30s", "1m"]},
+      "timezone": "browser",
+      "title": "Workshop vcluster — cold start vs checkpoint restore",
+      "uid": "workshop-vcluster",
+      "version": 1
+    }

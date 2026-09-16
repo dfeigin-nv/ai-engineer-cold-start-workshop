@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-model-cache
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ${STORAGE_CLASS}
+  resources:
+    requests:
+      storage: ${MODEL_CACHE_SIZE}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: snapshot-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ${STORAGE_CLASS}
+  resources:
+    requests:
+      storage: ${SNAPSHOT_SIZE}

@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workshop-aiperf-runner
+  namespace: ${HOST_NAMESPACE}
+data:
+  stop-load.sh: |-
+    #!/usr/bin/env bash
+    set -u
+    for pid_file in /tmp/workshop-aiperf-base.pid /tmp/workshop-aiperf-fast-criu.pid /tmp/workshop-aiperf-supervisor.pid; do
+      [ -f "$pid_file" ] || continue
+      kill "$(cat "$pid_file")" 2>/dev/null || true
+      rm -f "$pid_file"
+    done
+    rm -f /tmp/load-active
+  run-load.sh: |-
+    #!/usr/bin/env bash
+    set -u
+    run_profile() {
+      lane="$1"
+      url="$2"
+      aiperf profile \
+        --model "$AIPERF_MODEL" \
+        --url "$url" \
+        --endpoint-type chat \
+        --streaming \
+        --concurrency "$AIPERF_CONCURRENCY" \
+        --request-rate 6 \
+        --arrival-pattern constant \
+        --random-seed 424242 \
+        --benchmark-duration 86400 \
+        --slice-duration 2 \
+        --request-timeout-seconds 180 \
+        --extra-inputs "max_completion_tokens:$AIPERF_MAX_COMPLETION_TOKENS" \
+        --artifact-dir "/tmp/aiperf-$lane"
+    }
+    pids=()
+    case "$AIPERF_MODE" in
+      both|cold-start)
+        run_profile base "http://vllm-base-frontend-x-default-x-${VCLUSTER_NAME}:8000" &
+        echo "$!" >/tmp/workshop-aiperf-base.pid
+        pids+=("$!")
+        ;;
+    esac
+    case "$AIPERF_MODE" in
+      both|restore)
+        run_profile fast-criu "http://vllm-fast-criu-frontend-x-default-x-${VCLUSTER_NAME}:8000" &
+        echo "$!" >/tmp/workshop-aiperf-fast-criu.pid
+        pids+=("$!")
+        ;;
+    esac
+    sleep 5
+    for pid in "${pids[@]}"; do kill -0 "$pid" || exit 1; done
+    touch /tmp/load-active
+    rc=0
+    for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+    rm -f /tmp/load-active /tmp/workshop-aiperf-*.pid
+    exit "$rc"
+  start-load.sh: |-
+    #!/usr/bin/env bash
+    set -euo pipefail
+    /opt/workshop/stop-load.sh
+    nohup /opt/workshop/run-load.sh >/tmp/workshop-aiperf.log 2>&1 </dev/null &
+    echo "$!" >/tmp/workshop-aiperf-supervisor.pid
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-aiperf-runner
+  namespace: ${HOST_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: workshop-vcluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workshop-aiperf-runner
+  template:
+    metadata:
+      labels:
+        app: workshop-aiperf-runner
+    spec:
+      containers:
+        - name: aiperf
+          image: python:3.11-slim
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "4"
+              memory: 8Gi
+            limits:
+              cpu: "16"
+              memory: 32Gi
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/aiperf-ready"]
+            periodSeconds: 1
+          startupProbe:
+            exec:
+              command: ["test", "-f", "/tmp/aiperf-ready"]
+            periodSeconds: 2
+            failureThreshold: 180
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/workshop
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              pip install --quiet --no-cache-dir aiperf
+              python -c 'from transformers import AutoTokenizer; AutoTokenizer.from_pretrained("${AIPERF_MODEL}")'
+              touch /tmp/aiperf-ready
+              exec sleep infinity
+      volumes:
+        - name: scripts
+          configMap:
+            name: workshop-aiperf-runner
+            defaultMode: 0555
