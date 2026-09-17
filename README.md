@@ -6,7 +6,7 @@ load. Two otherwise equivalent NVIDIA Dynamo lanes begin with one Ready vLLM wor
 - **cold-start** starts a second worker normally;
 - **snapshot** restores a second worker from a Ready Dynamo checkpoint.
 
-AIPerf sends a fixed 6 requests/s to each selected lane before scale-up. The Grafana
+AIPerf sends a fixed 5 requests/s to each selected lane before scale-up. The Grafana
 chart shows serving time to first token (TTFT) under that load. Both lanes begin above
 the 50 ms healthy boundary with one worker; the snapshot lane should recover first
 when its restored worker joins, followed by the cold-start lane after model startup.
@@ -26,11 +26,12 @@ http://localhost:3030/d/workshop-vcluster/workshop-vcluster?from=now-15m&to=now&
 The dashboard contains one red cold-start line and one green snapshot line, plus three
 event markers: demo fired, snapshot completed, and cold-start completed. Grafana
 refreshes every 2 seconds. Prometheus scrapes the workshop frontends every second; the
-chart plots a 30-second rolling p50 at 10-second points to keep the comparison readable.
+chart plots a 30-second rolling mean at 10-second points to keep the comparison readable.
 
-A validated Dynamo 1.4.0 run on B200 measured 429.2 seconds from container start to
-first token for cold-start and 25.2 seconds for snapshot restore: a 17.03x speedup.
-Both lanes settled near 15-20 ms serving TTFT after the second worker joined.
+A validated Dynamo 1.4.0 run on B200 measured 425.6 seconds from container start to
+first token for cold-start and 32.7 seconds for snapshot restore: a 13.02x speedup.
+Under the fixed load, both lanes started near 345 ms serving TTFT and settled near
+20 ms after the second worker joined.
 
 ## Run the workshop
 

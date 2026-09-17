@@ -83,20 +83,38 @@ declare -A new_pod container_start_iso container_delay_seconds
 declare -A runtime_ready_seconds trigger_ready_seconds
 declare -A client_ttft_seconds container_first_token_seconds scale_first_token_seconds
 measure_first_token() {
-  local lane="$1" ready_epoch="$2" port first_token_epoch started_epoch
+  local lane="$1" port first_token_epoch started_epoch
+  local request_start_epoch stream_fd curl_pid line payload
   if [ "$lane" = base ]; then
     port="$BASE_FRONTEND_LOCAL_PORT"
   else
     port="$FAST_FRONTEND_LOCAL_PORT"
   fi
-  client_ttft_seconds[$lane]="$(curl -fsS -N --max-time 120 \
-    -o "$run_dir/${lane}-first-token.txt" -w '%{time_starttransfer}' \
+  : >"$run_dir/${lane}-first-token.txt"
+  request_start_epoch="$(date +%s.%N)"
+  exec {stream_fd}< <(curl -fsS -N --max-time 120 \
     "http://127.0.0.1:${port}/v1/chat/completions" \
-    -H 'Content-Type: application/json' -d "$stream_request_body")"
-  grep -q '^data:' "$run_dir/${lane}-first-token.txt" \
-    || die "${lane} first-token request did not return an SSE stream"
-  first_token_epoch="$(awk -v ready="$ready_epoch" -v ttft="${client_ttft_seconds[$lane]}" \
-    'BEGIN {printf "%.6f", ready+ttft}')"
+    -H 'Content-Type: application/json' -d "$stream_request_body")
+  curl_pid=$!
+  first_token_epoch=''
+  while IFS= read -r line <&"$stream_fd"; do
+    printf '%s\n' "$line" >>"$run_dir/${lane}-first-token.txt"
+    if [ -z "$first_token_epoch" ] && [[ "$line" == data:\ * ]] \
+        && [ "$line" != 'data: [DONE]' ]; then
+      payload="${line#data: }"
+      if printf '%s' "$payload" | jq -e \
+          'any(.choices[]?; ((.delta.content? // .text? // "") | length) > 0)' \
+          >/dev/null 2>&1; then
+        first_token_epoch="$(date +%s.%N)"
+      fi
+    fi
+  done
+  exec {stream_fd}<&-
+  wait "$curl_pid" || die "${lane} first-token request failed"
+  [ -n "$first_token_epoch" ] \
+    || die "${lane} first-token request did not return a token-bearing SSE event"
+  client_ttft_seconds[$lane]="$(awk -v end="$first_token_epoch" -v start="$request_start_epoch" \
+    'BEGIN {printf "%.6f", end-start}')"
   started_epoch="$(date --date="${container_start_iso[$lane]}" +%s.%N)"
   container_first_token_seconds[$lane]="$(awk -v end="$first_token_epoch" -v start="$started_epoch" \
     'BEGIN {printf "%.1f", end-start}')"
@@ -145,7 +163,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
       started_epoch="$(date --date="${container_start_iso[$lane]}" +%s.%N)"
       runtime_ready_seconds[$lane]="$(awk -v end="$ready_epoch" -v start="$started_epoch" 'BEGIN {printf "%.1f", end-start}')"
       trigger_ready_seconds[$lane]="$(awk -v end="$ready_epoch" -v start="$t0_epoch" 'BEGIN {printf "%.1f", end-start}')"
-      measure_first_token "$lane" "$ready_epoch"
+      measure_first_token "$lane"
       info "${lane}: ${pod} Ready in ${runtime_ready_seconds[$lane]}s from container start (${trigger_ready_seconds[$lane]}s from trigger)"
     fi
   done

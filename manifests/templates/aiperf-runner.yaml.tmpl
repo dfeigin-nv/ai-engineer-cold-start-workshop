@@ -7,11 +7,15 @@ data:
   stop-load.sh: |-
     #!/usr/bin/env bash
     set -u
-    for pid_file in /tmp/workshop-aiperf-base.pid /tmp/workshop-aiperf-fast-criu.pid /tmp/workshop-aiperf-supervisor.pid; do
+    for pid_file in /tmp/workshop-aiperf-base.pid /tmp/workshop-aiperf-fast-criu.pid; do
       [ -f "$pid_file" ] || continue
-      kill "$(cat "$pid_file")" 2>/dev/null || true
+      kill -- "-$(cat "$pid_file")" 2>/dev/null || true
       rm -f "$pid_file"
     done
+    if [ -f /tmp/workshop-aiperf-supervisor.pid ]; then
+      kill "$(cat /tmp/workshop-aiperf-supervisor.pid)" 2>/dev/null || true
+      rm -f /tmp/workshop-aiperf-supervisor.pid
+    fi
     rm -f /tmp/load-active
   run-load.sh: |-
     #!/usr/bin/env bash
@@ -19,7 +23,7 @@ data:
     run_profile() {
       lane="$1"
       url="$2"
-      aiperf profile \
+      exec setsid aiperf profile \
         --model "$AIPERF_MODEL" \
         --url "$url" \
         --endpoint-type chat \
@@ -62,6 +66,17 @@ data:
     /opt/workshop/stop-load.sh
     nohup /opt/workshop/run-load.sh >/tmp/workshop-aiperf.log 2>&1 </dev/null &
     echo "$!" >/tmp/workshop-aiperf-supervisor.pid
+  reaper.py: |-
+    import os
+    import time
+
+    while True:
+        try:
+            while os.waitpid(-1, os.WNOHANG)[0]:
+                pass
+        except ChildProcessError:
+            pass
+        time.sleep(1)
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -110,7 +125,7 @@ spec:
               pip install --quiet --no-cache-dir aiperf
               python -c 'from transformers import AutoTokenizer; AutoTokenizer.from_pretrained("${AIPERF_MODEL}")'
               touch /tmp/aiperf-ready
-              exec sleep infinity
+              exec python /opt/workshop/reaper.py
       volumes:
         - name: scripts
           configMap:
