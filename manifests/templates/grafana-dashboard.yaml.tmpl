@@ -14,7 +14,7 @@ data:
           {
             "datasource": {"type": "loki", "uid": "${GRAFANA_LOKI_DATASOURCE_UID}"},
             "enable": true,
-            "expr": "{job=\"workshop-vcluster-status\", lane=\"base\"} |= \"Requested\"",
+            "expr": "{job=\"workshop-vcluster-status\", lane=\"demo\"} |= \"Scale-up requested\"",
             "hide": false,
             "iconColor": "blue",
             "name": "Demo fired",
@@ -82,6 +82,7 @@ data:
           "fieldConfig": {
             "defaults": {
               "custom": {"axisGridShow": false, "drawStyle": "line", "fillOpacity": 0, "gradientMode": "none", "lineInterpolation": "linear", "lineStyle": {"fill": "solid"}, "lineWidth": 3, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}},
+              "min": 0,
               "unit": "ms"
             },
             "overrides": [

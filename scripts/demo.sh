@@ -65,6 +65,7 @@ t0_display="$(date +%H:%M:%S) local"
 
 info "firing ${demo_mode} at $t0_iso"
 demo_consumed=yes
+push_demo_status demo "🔵 Scale-up requested ${t0_display}"
 for lane in "${lanes[@]}"; do
   if [ "$lane" = base ]; then icon='🔴'; else icon='🟢'; fi
   push_demo_status "$lane" "${icon} Requested ${t0_display} — waiting for first token"
