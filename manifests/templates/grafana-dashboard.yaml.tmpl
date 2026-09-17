@@ -109,26 +109,47 @@ data:
           },
           "targets": [
             {
-              "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(dynamo_frontend_time_to_first_token_seconds_bucket{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"vllm-base-frontend-.*\"}[30s])))",
+              "expr": "1000 * sum(rate(dynamo_frontend_time_to_first_token_seconds_sum{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"$cold_pod_regex\"}[30s])) / sum(rate(dynamo_frontend_time_to_first_token_seconds_count{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"$cold_pod_regex\"}[30s]))",
               "interval": "10s",
               "legendFormat": "cold-start",
               "refId": "A"
             },
             {
-              "expr": "1000 * histogram_quantile(0.50, sum by (le) (rate(dynamo_frontend_time_to_first_token_seconds_bucket{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"vllm-fast-criu-frontend-.*\"}[30s])))",
+              "expr": "1000 * sum(rate(dynamo_frontend_time_to_first_token_seconds_sum{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"$snapshot_pod_regex\"}[30s])) / sum(rate(dynamo_frontend_time_to_first_token_seconds_count{job=\"monitoring/workshop-vcluster-frontend\",namespace=\"${HOST_NAMESPACE}\",pod=~\"$snapshot_pod_regex\"}[30s]))",
               "interval": "10s",
               "legendFormat": "snapshot",
               "refId": "B"
             }
           ],
-          "title": "Serving TTFT under fixed load (6 req/s per lane)",
+          "title": "Mean serving TTFT under fixed load (5 req/s per lane)",
           "type": "timeseries"
         }
       ],
       "refresh": "2s",
       "schemaVersion": 38,
       "tags": ["workshop-vcluster", "checkpoint-restore"],
-      "templating": {"list": []},
+      "templating": {
+        "list": [
+          {
+            "current": {"selected": true, "text": "vllm-base-frontend-.*", "value": "vllm-base-frontend-.*"},
+            "hide": 2,
+            "name": "cold_pod_regex",
+            "options": [],
+            "query": "vllm-base-frontend-.*",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {"selected": true, "text": "vllm-fast-criu-frontend-.*", "value": "vllm-fast-criu-frontend-.*"},
+            "hide": 2,
+            "name": "snapshot_pod_regex",
+            "options": [],
+            "query": "vllm-fast-criu-frontend-.*",
+            "skipUrlSync": false,
+            "type": "textbox"
+          }
+        ]
+      },
       "time": {"from": "now-15m", "to": "now"},
       "timepicker": {"refresh_intervals": ["2s", "5s", "10s", "30s", "1m"]},
       "timezone": "browser",

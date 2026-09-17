@@ -63,7 +63,7 @@ done
 printf '%s\n' "$prepared_state" >"$STATE_DIR/prepared.json"
 for lane in "${lanes[@]}"; do
   if [ "$lane" = base ]; then icon='🔴'; else icon='🟢'; fi
-  push_demo_status "$lane" "${icon} FIXED LOAD ACTIVE · 6 req/s · run demo ${1:---both}"
+  push_demo_status "$lane" "${icon} FIXED LOAD ACTIVE · 5 req/s · run demo ${1:---both}"
 done
-info "${prepare_mode} is prepared: one worker per lane and fixed 6 req/s load active"
+info "${prepare_mode} is prepared: one worker per lane and fixed 5 req/s load active"
 info "Grafana: $GRAFANA_DASHBOARD_URL"
